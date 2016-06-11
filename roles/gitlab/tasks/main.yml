@@ -1,0 +1,59 @@
+---
+- name: Include OS-specific variables
+  include_vars: "{{ ansible_os_family }}.yml"
+
+- name: Install all necessary dependencies (RedHat)
+  yum: name={{ item }} state=latest
+  with_items:
+    - curl
+    - policycoreutils
+    - openssh-server
+    - openssh-clients
+    - postfix
+  when: ansible_os_family == "RedHat"
+
+- name: Install all necessary dependencies (Debian)
+  apt: name={{ item }} state=latest update_cache=yes
+  with_items:
+    - curl
+    - openssh-server
+    - ca-certificates
+    - postfix
+  when: ansible_os_family == "Debian"
+
+- name: Start sshd
+  service: name=sshd state=started enabled=yes
+
+- name: Start Postfix
+  service: name=postfix state=started enabled=yes
+
+- name: Configure firewalld
+  firewalld: service=http permanent=true state=enabled
+  notify: Reload firewalld
+  when: ansible_os_family == "RedHat"
+
+- name: Check if GitLab is already installed
+  stat: path=/usr/bin/gitlab-ctl
+  register: gitlab_installed
+
+- name: Download Gitlab installation script
+  get_url: url={{ gitlab_repo_path }} dest=/tmp/gitlab.sh mode=0755
+  when: (gitlab_installed.stat.exists == false)
+
+- name: Install Gitlab repository
+  command: /tmp/gitlab.sh
+  when: (gitlab_installed.stat.exists == false)
+
+- name: Install Gitlab on RedHat
+  yum: name=gitlab-ce state=latest
+  notify: Reconfigure gitlab
+  when: ansible_os_family == "RedHat"
+
+- name: Install Gitlab on Debian
+  apt: name=gitlab-ce state=latest
+  notify: Reconfigure gitlab
+  when: ansible_os_family == "Debian"
+
+- name: Modify external url
+  lineinfile: dest=/etc/gitlab/gitlab.rb regexp="^external_url" line="external_url '{{ gitlab_external_url }}'" state=present
+  notify: Reconfigure gitlab

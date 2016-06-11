@@ -1,0 +1,6 @@
+---
+- name: Install Gitlab CE Omnibus package
+  hosts: gitlab
+  become: yes
+  roles:
+    - gitlab 

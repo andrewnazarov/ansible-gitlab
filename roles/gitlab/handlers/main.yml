@@ -1,0 +1,12 @@
+---
+- name: Reload firewalld
+  service: name=firewalld state=reloaded
+
+- name: Reconfigure gitlab
+  command: gitlab-ctl reconfigure
+  notify: Restart gitlab
+  
+- name: Restart gitlab
+  command: gitlab-ctl restart
+
+  
